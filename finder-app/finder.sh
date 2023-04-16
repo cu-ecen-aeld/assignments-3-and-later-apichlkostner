@@ -16,7 +16,7 @@ fi
 
 NR_FILES=`find $FILESDIR -type f | wc -l`
 
-NR_MATCHES=`cat $(find $FILESDIR -type f) | grep -c $SEARCHSTR`
+NR_MATCHES=`grep -r $SEARCHSTR $FILESDIR | wc -l`
 
 echo The number of files are $NR_FILES and the number of matching lines are $NR_MATCHES
 

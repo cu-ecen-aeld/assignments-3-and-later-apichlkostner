@@ -12,4 +12,4 @@ writer: $(OBJ)
 	$(CC) $(CFLAGS) -c $<
 
 clean:
-	rm writer $(OBJ)
+	rm -f writer $(OBJ)

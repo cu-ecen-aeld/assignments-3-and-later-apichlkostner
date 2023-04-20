@@ -5,6 +5,8 @@ LDFLAGS=
 
 OBJ = writer.o
 
+all: writer
+
 writer: $(OBJ)
 	$(CC) $(CFLAGS) -o writer $(OBJ) $(LDFLAGS)
 

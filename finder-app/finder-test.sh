@@ -21,11 +21,6 @@ else
 	WRITER=writer
 fi
 
-if [ -f ./finder.sh ]; then
-	FINDER=./finder.sh
-else
-	FINDER=finder.sh
-fi
 
 if [ $# -lt 3 ]
 then
@@ -70,7 +65,11 @@ do
 	${WRITER} "$WRITEDIR/${username}$i.txt" "$WRITESTR"
 done
 
-OUTPUTSTRING=`$(FINDER) "$WRITEDIR" "$WRITESTR"`
+if [ -f ./finder.sh ]; then
+OUTPUTSTRING=$(./finder.sh "$WRITEDIR" "$WRITESTR")
+else
+OUTPUTSTRING=$(finder.sh "$WRITEDIR" "$WRITESTR")
+fi
 
 echo $OUTPUTSTRING > /tmp/assignment4-result.txt
 

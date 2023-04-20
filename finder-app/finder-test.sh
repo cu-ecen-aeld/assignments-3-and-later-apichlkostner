@@ -9,13 +9,13 @@ NUMFILES=10
 WRITESTR=AELD_IS_FUN
 WRITEDIR=/tmp/aeld-data
 
-if [ -e /etc/conf/username.txt ]; then
+if [ -f /etc/conf/username.txt ]; then
 	username=$(cat /etc/conf/username.txt)
 else
 	username=$(cat conf/username.txt)
 fi
 
-if [ -e ./writer ]; then
+if [ -f ./writer ]; then
 	WRITER=./writer
 else
 	WRITER=writer

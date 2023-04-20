@@ -21,6 +21,12 @@ else
 	WRITER=writer
 fi
 
+if [ -f ./finder.sh ]; then
+	FINDER=./finder.sh
+else
+	FINDER=finder.sh
+fi
+
 if [ $# -lt 3 ]
 then
 	echo "Using default value ${WRITESTR} for string to write"
@@ -64,7 +70,7 @@ do
 	${WRITER} "$WRITEDIR/${username}$i.txt" "$WRITESTR"
 done
 
-OUTPUTSTRING=$(./finder.sh "$WRITEDIR" "$WRITESTR")
+OUTPUTSTRING=`$(FINDER) "$WRITEDIR" "$WRITESTR"`
 
 echo $OUTPUTSTRING > /tmp/assignment4-result.txt
 

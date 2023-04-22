@@ -16,7 +16,7 @@ int install_signalhandler()
 
 static void signal_handler(int sig)
 {
-    DEBUG_LOG("Signalhandler start");
+    DEBUG_LOG("Signalhandler");
     if ((sig == SIGINT) || (sig == SIGTERM))
         server_stop();
     else

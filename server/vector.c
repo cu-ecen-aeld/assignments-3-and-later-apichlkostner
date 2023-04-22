@@ -1,7 +1,8 @@
 #include "vector.h"
+#include "debug.h"
 #include <stdlib.h>
 
-struct vector vector_create(size_t size)
+vector vector_create(size_t size)
 {
     vector v;
     v.data = (char *)malloc(size * sizeof(char));
@@ -10,14 +11,23 @@ struct vector vector_create(size_t size)
     return v;
 }
 
-void vector_delete(struct vector v)
+void vector_delete(vector v)
 {
-    if (v.data)
+    if (v.data) {
         free(v.data);
+        v.data = NULL;
+    } else {
+        ERROR_LOG("Delete invalid vector");
+        exit(EXIT_FAILURE);
+    }
     v.size = 0;
 }
 
-void vector_resize(struct vector v, size_t size)
+vector vector_resize(vector v, size_t size)
 {
-    v.data = realloc(v.data, size);
+    void *old_ptr = v.data;
+    v.data = realloc(old_ptr, size);
+    v.size = size;
+
+    return v;
 }

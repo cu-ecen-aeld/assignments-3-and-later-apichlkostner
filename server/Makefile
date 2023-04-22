@@ -4,7 +4,7 @@ CFLAGS=-pedantic -Wall -Wextra -Werror -O2
 LDFLAGS=
 
 NAME_EXE=aesdsocket
-OBJ = main.o aesdsocket.o
+OBJ = main.o server.o signalhandler.o
 
 all: $(NAME_EXE)
 

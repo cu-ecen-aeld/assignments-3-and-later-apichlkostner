@@ -1,5 +1,6 @@
-#include "aesdsocket.h"
+#include "server.h"
 #include "config.h"
+#include "debug.h"
 
 #include <errno.h>
 #include <memory.h>
@@ -11,9 +12,13 @@
 #include <syslog.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <stdbool.h>
+
 #include <stdlib.h>
 #include <string.h>
 
+static bool server_running = true;
+static int sfd;
 
 int server_run()
 {
@@ -23,7 +28,7 @@ int server_run()
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
     addr.sin_port = htons(PORT_NUM);
 
-    int sfd = socket(AF_INET, SOCK_STREAM, 0);
+    sfd = socket(AF_INET, SOCK_STREAM, 0);
 
     if (sfd == -1)
         return -1;
@@ -31,11 +36,11 @@ int server_run()
     if (setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)) < 0)
         return -1;
 
-    printf("Bind\n");
+    DEBUG_LOG("Bind");
     if (bind(sfd, (struct sockaddr *)&addr, sizeof(struct sockaddr)) == -1)
         return -1;
 
-    printf("Listen\n");
+    DEBUG_LOG("Listen");
     if (listen(sfd, BACKLOG) == -1)
         return -1;
 
@@ -43,27 +48,25 @@ int server_run()
         char buffer[BUFFERSIZE];
         socklen_t addrlen = sizeof(struct sockaddr_storage);
         struct sockaddr_storage claddr;
-        printf("Accept\n");
+        
+        DEBUG_LOG("Accept");
+
         int cfd = accept(sfd, (struct sockaddr *)&claddr, &addrlen);
 
+        if (cfd == -1)
+            return -1;
 
-        char host[NI_MAXHOST + 1];
-        char service[NI_MAXSERV + 1];
-        //char addr_str[NI_MAXHOST + NI_MAXSERV + 10];
+        char host[NI_MAXHOST];
+        char service[NI_MAXSERV];
+
         if (getnameinfo((struct sockaddr *)&claddr, addrlen, host, NI_MAXHOST, service, NI_MAXSERV, 0) != 0)
             snprintf(host, NI_MAXHOST, "UNKNOWN");
-            //snprintf(addr_str, sizeof(addr_str), "(%s %s)", host, service);
 
 
         syslog(LOG_DEBUG, "Accepted connection from %s", host);
-        printf("ADDR = %s\n", host);
+        DEBUG_LOG("ADDR = %s", host);
 
-        if (cfd == -1) {
-            printf("Error accept\n");
-            continue;
-        }
-
-        printf("Read\n");
+        DEBUG_LOG("Read");
         ssize_t num_read = read(cfd, buffer, sizeof(buffer));
 
         if (num_read == -1) {
@@ -72,8 +75,6 @@ int server_run()
             else
                 return -1;
         }
-
-        //printf("Received: %s\n", buffer);
 
         int fd = open(LOGFILE_NAME, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 
@@ -86,7 +87,21 @@ int server_run()
 
         if (num_written < num_read)
             return -1;
+
+        close(fd);
+        close(cfd);
     }
 
+    close(sfd);
+
     return 0;
+}
+
+void server_stop()
+{
+    server_running = false;
+    int old_errno = errno;
+    if (shutdown(sfd, SHUT_RDWR) == -1)
+        ERROR_LOG("Error shutdown socket: %s", strerror(errno));
+    errno = old_errno;
 }

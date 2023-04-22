@@ -1,6 +1,7 @@
 #include "server.h"
 #include "config.h"
 #include "debug.h"
+#include "damon.h"
 #include "readline.h"
 #include "vector.h"
 
@@ -14,8 +15,6 @@
 #include <syslog.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <stdbool.h>
-
 #include <stdlib.h>
 #include <string.h>
 
@@ -26,7 +25,7 @@ static int sfd;
 
 #define RETURN_FROM_LOOP_WITH_ERROR {server_running = false; ret_val = -1; break;}
 
-int server_run()
+int server_run(bool daemon)
 {
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(struct sockaddr_in));
@@ -46,6 +45,12 @@ int server_run()
     DEBUG_LOG("Bind");
     if (bind(sfd, (struct sockaddr *)&addr, sizeof(struct sockaddr)) == -1)
         return -1;
+
+    if (daemon) {
+        DEBUG_LOG("Call damonize");
+        if (daemonize() == -1)
+            ERROR_LOG("Error trying to damonize");
+    }
 
     DEBUG_LOG("Listen");
     if (listen(sfd, BACKLOG) == -1)

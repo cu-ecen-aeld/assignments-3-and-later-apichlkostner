@@ -2,6 +2,7 @@
 #include "server.h"
 #include "debug.h"
 #include "signalhandler.h"
+#include <string.h>
 #include <syslog.h>
 #include <stddef.h>
 
@@ -14,5 +15,10 @@ int main (int argc, char *argv[])
 
     openlog(NULL, 0, LOG_USER);
 
-    return server_run();
+    bool daemon = false;
+    if ((argc > 1) && (strcmp(argv[1], "-d") == 0)) {
+        daemon = true;
+    }
+
+    return server_run(daemon);
 }

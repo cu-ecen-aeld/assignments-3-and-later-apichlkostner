@@ -4,7 +4,7 @@ CFLAGS=-pedantic -Wall -Wextra -Werror -Og -g
 LDFLAGS=
 
 NAME_EXE=aesdsocket
-OBJ = main.o readline.o server.o signalhandler.o vector.o
+OBJ = daemon.o main.o readline.o server.o signalhandler.o vector.o
 
 all: $(NAME_EXE)
 

@@ -1,4 +1,6 @@
 #pragma once
 
-int server_run();
+#include <stdbool.h>
+
+int server_run(bool daemon);
 void server_stop();

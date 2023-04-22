@@ -2,6 +2,8 @@
 #include "debug.h"
 #include "server.h"
 
+#include <syslog.h>
+
 static void signal_handler(int sig);
 
 
@@ -17,8 +19,10 @@ int install_signalhandler()
 static void signal_handler(int sig)
 {
     DEBUG_LOG("Signalhandler");
-    if ((sig == SIGINT) || (sig == SIGTERM))
+    if ((sig == SIGINT) || (sig == SIGTERM)) {
+        syslog(LOG_DEBUG, "Caught signal, exiting");
         server_stop();
-    else
+    } else  {
         ERROR_LOG("Signalhandler called with unexpected signal");
+    }
 }

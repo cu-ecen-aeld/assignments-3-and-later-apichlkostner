@@ -19,6 +19,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+static void sent_back_logfile(int cfd);
+
 static bool server_running = true;
 static int sfd;
 
@@ -99,7 +101,7 @@ int server_run()
             } while(!readline_finished);
 
             if (num_read <= 0)
-                    break;
+                break;
                         
             int num_written = write(fd, buffer.data, pos);
 
@@ -109,13 +111,7 @@ int server_run()
                 DEBUG_LOG("Written to logfile: %s", buffer.data);
             }
 
-            int num_sent_back = write(cfd, buffer.data, pos);
-
-            if (num_sent_back < pos) {
-                RETURN_FROM_LOOP_WITH_ERROR;
-            } else {
-                DEBUG_LOG("Written to socket: %s", buffer.data);
-            }
+            sent_back_logfile(cfd);
         }
         close(cfd);
         cfd = -1;
@@ -145,4 +141,17 @@ void server_stop()
     if (shutdown(sfd, SHUT_RDWR) == -1)
         ERROR_LOG("Error shutdown socket: %s", strerror(errno));
     errno = old_errno;
+}
+
+static void sent_back_logfile(int cfd)
+{
+    int fd = open(LOGFILE_NAME, O_RDONLY);
+    char *buf[1024];
+
+    ssize_t num_read = 0;
+    do {
+        num_read = read(fd, buf, sizeof(buf));
+        if (write(cfd, buf, num_read) != num_read)
+            ERROR_LOG("Could not sent back all data");
+    } while(num_read > 0);
 }

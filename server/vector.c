@@ -6,6 +6,7 @@ vector vector_create(size_t size)
 {
     vector v;
     v.data = (char *)malloc(size * sizeof(char));
+    v.pos = 0;
     v.size = size;
 
     return v;

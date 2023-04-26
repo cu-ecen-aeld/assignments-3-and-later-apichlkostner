@@ -1,10 +1,10 @@
 
-CC = $(CROSS_COMPILE)gcc
-CFLAGS=-pedantic -Wall -Wextra -Werror -Og -g
-LDFLAGS=
+CC?=$(CROSS_COMPILE)gcc
+CFLAGS?=-pedantic -Wall -Wextra -Werror -Og -g
+LDFLAGS?=-lpthread
 
 NAME_EXE=aesdsocket
-OBJ = daemon.o main.o readline.o server.o signalhandler.o vector.o
+OBJ = daemon.o logger.o main.o readline.o server.o serve_request.o signalhandler.o vector.o
 
 all: $(NAME_EXE)
 

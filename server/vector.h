@@ -4,6 +4,7 @@
 
 typedef struct vector {
     char *data;
+    size_t pos;
     size_t size;
 } vector;
 

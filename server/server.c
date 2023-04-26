@@ -2,7 +2,9 @@
 #include "config.h"
 #include "debug.h"
 #include "damon.h"
+#include "logger.h"
 #include "readline.h"
+#include "serve_request.h"
 #include "vector.h"
 
 #include <errno.h>
@@ -18,7 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-static void sent_back_logfile(int cfd);
+
 
 static bool server_running = true;
 static int sfd;
@@ -43,8 +45,10 @@ int server_run(bool daemon)
         return -1;
 
     DEBUG_LOG("Bind");
-    if (bind(sfd, (struct sockaddr *)&addr, sizeof(struct sockaddr)) == -1)
+    if (bind(sfd, (struct sockaddr *)&addr, sizeof(struct sockaddr)) == -1) {
+        ERROR_LOG("Could not bind to socket: %s", strerror(errno));
         return -1;
+    }
 
     if (daemon) {
         DEBUG_LOG("Call damonize");
@@ -53,19 +57,28 @@ int server_run(bool daemon)
     }
 
     DEBUG_LOG("Listen");
-    if (listen(sfd, BACKLOG) == -1)
+    if (listen(sfd, BACKLOG) == -1) {
+        ERROR_LOG("Could not listen to socket: %s", strerror(errno));
         return -1;
+    }
 
     int ret_val = 0;
 
-    int fd = open(LOGFILE_NAME, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (fd == -1) {
+    logger log;
+
+    int ret = logger_open(&log, LOGFILE_NAME);
+
+    if (ret == -1) {
         syslog(LOG_ERR, "Could not open logfile %s, error %s", LOGFILE_NAME, strerror(errno));
         return -1;
     }
 
+    pthread_t thread[100];
+    serve_data sd[100];
+    size_t thread_num = 0;
+
+
     while(server_running) {
-        vector buffer = vector_create(1024);
         socklen_t addrlen = sizeof(struct sockaddr_storage);
         struct sockaddr_storage claddr;
         
@@ -85,49 +98,44 @@ int server_run(bool daemon)
         syslog(LOG_DEBUG, "Accepted connection from %s", host);
         DEBUG_LOG("ADDR = %s", host);
 
-        while(1) {
-            DEBUG_LOG("Read");
-            ssize_t num_read = 0;
-            bool readline_finished = false;
-            ssize_t pos = 0;
-            do {
-                readline_finished = read_line(cfd, &buffer.data[pos], buffer.size - pos, &num_read);
-
-                pos += num_read;
-
-                if (num_read <= 0)
-                    break;
-                    
-                // increase buffer size if necessary
-                if (!readline_finished) {
-                    DEBUG_LOG("Resizing vector");
-                    buffer = vector_resize(buffer, 2 * buffer.size);
-                }
-            } while(!readline_finished);
-
-            if (num_read <= 0)
-                break;
-                        
-            int num_written = write(fd, buffer.data, pos);
-
-            if (num_written < pos) {
-                RETURN_FROM_LOOP_WITH_ERROR;
-            } else {
-                DEBUG_LOG("Written to logfile: %s", buffer.data);
+        sd[thread_num].cfd = cfd;
+        sd[thread_num].log = log;
+        sd[thread_num].finished = false;
+        sd[thread_num].joined = false;
+        
+        int s = pthread_create(&thread[thread_num], NULL, serve_request, (void *)&sd[thread_num]);
+        thread_num++;
+        if (s != 0)
+            return -1;
+        
+        for (size_t i = 0; i < thread_num; i++) {
+            if (sd[i].finished && !sd[i].joined) {
+                DEBUG_LOG("<--------------- joining threads %ld", i);
+                int s = pthread_join(thread[i], NULL);
+                if (s != 0)
+                    return -1;
+                sd[i].joined = true;
             }
-
-            sent_back_logfile(cfd);
         }
-        close(cfd);
-        cfd = -1;
-        syslog(LOG_DEBUG, "Closed connection from %s", host);
-        vector_delete(buffer);
     }
+
+    DEBUG_LOG("---------------> joining threads");
+    for (size_t i = 0; i < thread_num; i++) {
+        if (sd[i].finished && !sd[i].joined) {
+            DEBUG_LOG("<--------------- joining threads %ld", i);
+            int s = pthread_join(thread[i], NULL);
+            if (s != 0)
+                return -1;
+            sd[i].joined = true;
+        }
+    }
+    DEBUG_LOG("<--------------- joining threads");
 
     if (sfd != -1)
         close(sfd);
-    if (fd != -1)
-        close(fd);
+    
+    logger_close(&log);
+
     if (cfd != -1)
         close(cfd);
 
@@ -148,15 +156,3 @@ void server_stop()
     errno = old_errno;
 }
 
-static void sent_back_logfile(int cfd)
-{
-    int fd = open(LOGFILE_NAME, O_RDONLY);
-    char *buf[1024];
-
-    ssize_t num_read = 0;
-    do {
-        num_read = read(fd, buf, sizeof(buf));
-        if (write(cfd, buf, num_read) != num_read)
-            ERROR_LOG("Could not sent back all data");
-    } while(num_read > 0);
-}

@@ -12,4 +12,5 @@
     #define DEBUG_LOG(msg,...) syslog(LOG_DEBUG, "Server: " msg "\n" , ##__VA_ARGS__)
 #endif
 
-#define ERROR_LOG(msg,...) printf("Server ERROR: " msg "\n" , ##__VA_ARGS__)
+//#define ERROR_LOG(msg,...) printf("Server ERROR: " msg "\n" , ##__VA_ARGS__)
+#define ERROR_LOG(msg,...) syslog(LOG_ERR, "Server: " msg "\n" , ##__VA_ARGS__)

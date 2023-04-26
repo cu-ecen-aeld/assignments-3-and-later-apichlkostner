@@ -16,8 +16,8 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
-static void sent_back_logfile(int cfd);
 
 void *serve_request(void *args)
 {
@@ -30,7 +30,7 @@ void *serve_request(void *args)
 
     serve_data *sd = (serve_data *)args;
 
-    while(1) {
+    while(!sd->do_exit) {
         DEBUG_LOG("Read from %d", sd->cfd);
         ssize_t num_read = 0;
         bool readline_finished = false;
@@ -55,12 +55,15 @@ void *serve_request(void *args)
                     
         logger_write(&(sd->log), buffer);
 
-        sent_back_logfile(sd->cfd);
+        if (logger_send(&(sd->log), sd->cfd) == -1) {
+            ERROR_LOG("Could not sent back data");
+            break;
+        }
     }
     close(sd->cfd);
     sd->cfd = -1;
     //syslog(LOG_DEBUG, "Closed connection from %s", host);
-    vector_delete(buffer);
+    vector_delete(&buffer);
 
     DEBUG_LOG("<--------------- serve_request end");
 
@@ -69,18 +72,39 @@ void *serve_request(void *args)
     return NULL;
 }
 
-static void sent_back_logfile(int cfd)
+void *timelog(void *args)
 {
-    int fd = open(LOGFILE_NAME, O_RDONLY);
-    char *buf[1024];
+    if (args == NULL)
+            return NULL;
 
-    DEBUG_LOG("sent_back_logfile start");
+    serve_data *sd = (serve_data *)args;
+    vector buffer = vector_create(256);
+    time_t t;
+    struct tm *tmp;
+    
+    DEBUG_LOG("-> Starting timelog");
+    int cnt = 0;
+    while(!sd->do_exit) {
+        sleep(1);
 
-    ssize_t num_read = 0;
-    do {
-        num_read = read(fd, buf, sizeof(buf));
-        DEBUG_LOG("Read %ld bytes from %d, send to %d", num_read, fd, cfd);
-        if (write(cfd, buf, num_read) != num_read)
-            ERROR_LOG("Could not sent back all data");
-    } while(num_read > 0);
+        if (cnt++ >= 9) {
+            t = time(NULL);
+            tmp = localtime(&t);
+
+            if (tmp == NULL)
+                continue;
+
+            if (strftime(buffer.data, buffer.size, "timestamp: %a, %d %b %Y %T %z\n", tmp) == 0)
+                continue;
+
+            buffer.pos = strlen(buffer.data);
+            logger_write(&(sd->log), buffer);
+            cnt = 0;
+        }
+    }
+
+    vector_delete(&buffer);
+    sd->finished = true;
+    DEBUG_LOG("-> Stopping timelog");
+    return NULL;
 }

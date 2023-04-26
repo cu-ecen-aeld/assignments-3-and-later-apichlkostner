@@ -73,10 +73,19 @@ int server_run(bool daemon)
         return -1;
     }
 
-    pthread_t thread[100];
-    serve_data sd[100];
+    pthread_t thread[1000];
+    serve_data sd[1000];
     size_t thread_num = 0;
 
+    sd[thread_num].cfd = cfd;
+    sd[thread_num].log = log;
+    sd[thread_num].finished = false;
+    sd[thread_num].joined = false;
+    sd[thread_num].do_exit = false;
+    int s = pthread_create(&thread[thread_num], NULL, timelog, (void *)&sd[thread_num]);
+    thread_num++;
+    if (s != 0)
+        return -1;
 
     while(server_running) {
         socklen_t addrlen = sizeof(struct sockaddr_storage);
@@ -102,6 +111,7 @@ int server_run(bool daemon)
         sd[thread_num].log = log;
         sd[thread_num].finished = false;
         sd[thread_num].joined = false;
+        sd[thread_num].do_exit = false;
         
         int s = pthread_create(&thread[thread_num], NULL, serve_request, (void *)&sd[thread_num]);
         thread_num++;
@@ -119,9 +129,14 @@ int server_run(bool daemon)
         }
     }
 
+    
     DEBUG_LOG("---------------> joining threads");
     for (size_t i = 0; i < thread_num; i++) {
-        if (sd[i].finished && !sd[i].joined) {
+        if (!sd[i].finished)
+            sd[i].do_exit = true;
+    }
+    for (size_t i = 0; i < thread_num; i++) {
+        if (!sd[i].joined) {
             DEBUG_LOG("<--------------- joining threads %ld", i);
             int s = pthread_join(thread[i], NULL);
             if (s != 0)

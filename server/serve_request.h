@@ -9,6 +9,9 @@ typedef struct serve_data {
     logger log;
     bool finished;
     bool joined;
+    bool do_exit;
 } serve_data;
 
 void *serve_request(void *args);
+
+void *timelog(void *args);

@@ -10,7 +10,7 @@
 
 int logger_open(logger *log, char* filename)
 {
-    int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    int fd = open(filename, O_RDWR | O_CREAT | O_TRUNC, 0644);
 
     DEBUG_LOG("Open logfile: %s", filename);
 
@@ -48,6 +48,8 @@ int logger_write(logger *log, vector buffer)
             return -1;
         }
 
+        fsync(log->fd);
+
         s = pthread_mutex_unlock(&(log->mtx));
         if (s != 0) {
             syslog(LOG_ERR, "Could not unlock mutex: %s", strerror(s));
@@ -58,6 +60,47 @@ int logger_write(logger *log, vector buffer)
     }
 
     return 0;
+}
+
+int logger_send(logger *log, int cfd)
+{
+    DEBUG_LOG("logger readln");
+    int retval = 0;
+
+    vector buffer = vector_create(1024);
+
+    if (log->fd != -1) {
+        int s = pthread_mutex_lock(&(log->mtx));
+        
+        if (s != 0) {
+            syslog(LOG_ERR, "Could not lock mutex: %s", strerror(s));
+            return -1;
+        }
+
+        lseek(log->fd, 0, SEEK_SET);
+        ssize_t num_read = 0;
+
+        do {
+            num_read = read(log->fd, buffer.data, buffer.size);
+            DEBUG_LOG("logger_send read %ld bytes from %d, send to %d", num_read, log->fd, cfd);
+
+            if (num_read > 0) {
+                if (write(cfd, buffer.data, num_read) != num_read)
+                    ERROR_LOG("Could not sent back all data");
+            }
+        } while(num_read > 0);
+
+        s = pthread_mutex_unlock(&(log->mtx));
+        if (s != 0) {
+            syslog(LOG_ERR, "Could not unlock mutex: %s", strerror(s));
+            retval = -1;
+        }
+    } else {
+        retval = -1;
+    }
+
+    vector_delete(&buffer);
+    return retval;
 }
 
 int logger_close(logger *log)

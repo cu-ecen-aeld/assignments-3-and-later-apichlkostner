@@ -10,4 +10,5 @@ typedef struct logger {
 
 int logger_open(logger *log, char* filename);
 int logger_write(logger *log, vector buffer);
+int logger_send(logger *log, int cfd);
 int logger_close(logger *log);

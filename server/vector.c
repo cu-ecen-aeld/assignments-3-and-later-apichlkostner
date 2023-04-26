@@ -12,16 +12,16 @@ vector vector_create(size_t size)
     return v;
 }
 
-void vector_delete(vector v)
+void vector_delete(vector *v)
 {
-    if (v.data) {
-        free(v.data);
-        v.data = NULL;
+    if (v->data) {
+        free(v->data);
+        v->data = NULL;
     } else {
         ERROR_LOG("Delete invalid vector");
         exit(EXIT_FAILURE);
     }
-    v.size = 0;
+    v->size = 0;
 }
 
 vector vector_resize(vector v, size_t size)

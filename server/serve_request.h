@@ -5,6 +5,7 @@
 #include <stdbool.h>
 
 typedef struct serve_data {
+    pthread_t thread;
     int cfd;
     logger log;
     bool finished;

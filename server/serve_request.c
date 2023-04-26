@@ -83,24 +83,20 @@ void *timelog(void *args)
     struct tm *tmp;
     
     DEBUG_LOG("-> Starting timelog");
-    int cnt = 0;
     while(!sd->do_exit) {
-        sleep(1);
+        sleep(10);
 
-        if (cnt++ >= 9) {
-            t = time(NULL);
-            tmp = localtime(&t);
+        t = time(NULL);
+        tmp = localtime(&t);
 
-            if (tmp == NULL)
-                continue;
+        if (tmp == NULL)
+            continue;
 
-            if (strftime(buffer.data, buffer.size, "timestamp: %a, %d %b %Y %T %z\n", tmp) == 0)
-                continue;
+        if (strftime(buffer.data, buffer.size, "timestamp: %a, %d %b %Y %T %z\n", tmp) == 0)
+            continue;
 
-            buffer.pos = strlen(buffer.data);
-            logger_write(&(sd->log), buffer);
-            cnt = 0;
-        }
+        buffer.pos = strlen(buffer.data);
+        logger_write(&(sd->log), buffer);
     }
 
     vector_delete(&buffer);

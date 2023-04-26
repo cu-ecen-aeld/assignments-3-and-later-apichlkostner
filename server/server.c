@@ -17,8 +17,10 @@
 #include <syslog.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/queue.h>
 
 
 
@@ -26,6 +28,8 @@ static bool server_running = true;
 static int sfd;
 
 #define RETURN_FROM_LOOP_WITH_ERROR {server_running = false; ret_val = -1; break;}
+
+static void serve_data_init(serve_data *sd, int cfd, logger log);
 
 int server_run(bool daemon)
 {
@@ -73,16 +77,11 @@ int server_run(bool daemon)
         return -1;
     }
 
-    pthread_t thread[1000];
-    serve_data sd[1000];
+    serve_data sd[100];
     size_t thread_num = 0;
 
-    sd[thread_num].cfd = cfd;
-    sd[thread_num].log = log;
-    sd[thread_num].finished = false;
-    sd[thread_num].joined = false;
-    sd[thread_num].do_exit = false;
-    int s = pthread_create(&thread[thread_num], NULL, timelog, (void *)&sd[thread_num]);
+    serve_data_init(&sd[thread_num], cfd, log);
+    int s = pthread_create(&sd[thread_num].thread, NULL, timelog, (void *)&sd[thread_num]);
     thread_num++;
     if (s != 0)
         return -1;
@@ -107,21 +106,17 @@ int server_run(bool daemon)
         syslog(LOG_DEBUG, "Accepted connection from %s", host);
         DEBUG_LOG("ADDR = %s", host);
 
-        sd[thread_num].cfd = cfd;
-        sd[thread_num].log = log;
-        sd[thread_num].finished = false;
-        sd[thread_num].joined = false;
-        sd[thread_num].do_exit = false;
-        
-        int s = pthread_create(&thread[thread_num], NULL, serve_request, (void *)&sd[thread_num]);
+        // serve request with new thread
+        serve_data_init(&sd[thread_num], cfd, log);
+        int s = pthread_create(&sd[thread_num].thread, NULL, serve_request, (void *)&sd[thread_num]);
         thread_num++;
         if (s != 0)
             return -1;
         
+        // join threads which have finished
         for (size_t i = 0; i < thread_num; i++) {
             if (sd[i].finished && !sd[i].joined) {
-                DEBUG_LOG("<--------------- joining threads %ld", i);
-                int s = pthread_join(thread[i], NULL);
+                int s = pthread_join(sd[i].thread, NULL);
                 if (s != 0)
                     return -1;
                 sd[i].joined = true;
@@ -129,23 +124,24 @@ int server_run(bool daemon)
         }
     }
 
-    
-    DEBUG_LOG("---------------> joining threads");
+    // send signal to thread to terminate
     for (size_t i = 0; i < thread_num; i++) {
-        if (!sd[i].finished)
+        if (!sd[i].finished) {
             sd[i].do_exit = true;
+            pthread_kill(sd[i].thread, SIGTERM);
+        }
     }
+    // join threads
     for (size_t i = 0; i < thread_num; i++) {
         if (!sd[i].joined) {
-            DEBUG_LOG("<--------------- joining threads %ld", i);
-            int s = pthread_join(thread[i], NULL);
+            int s = pthread_join(sd[i].thread, NULL);
             if (s != 0)
                 return -1;
             sd[i].joined = true;
         }
     }
-    DEBUG_LOG("<--------------- joining threads");
 
+    // clean file descriptors etc.
     if (sfd != -1)
         close(sfd);
     
@@ -170,4 +166,14 @@ void server_stop()
         ERROR_LOG("Error shutdown socket: %s", strerror(errno));
     errno = old_errno;
 }
+
+static void serve_data_init(serve_data *sd, int cfd, logger log)
+{
+    sd->cfd = cfd;
+    sd->log = log;
+    sd->finished = false;
+    sd->joined = false;
+    sd->do_exit = false;
+}
+
 

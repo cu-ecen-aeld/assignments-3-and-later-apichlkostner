@@ -14,6 +14,7 @@
 #include <string.h>
 #endif
 
+#include "debug.h"
 #include "aesd-circular-buffer.h"
 
 /**
@@ -29,9 +30,35 @@
 struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct aesd_circular_buffer *buffer,
             size_t char_offset, size_t *entry_offset_byte_rtn )
 {
-    /**
-    * TODO: implement per description
-    */
+    if ((buffer->in_offs == buffer->out_offs) && !buffer->full) {
+        DEBUG_LOG("Buffer empty");
+        return NULL;
+    }
+
+    size_t pos = buffer->out_offs;
+    size_t buffer_size = sizeof(buffer->entry) / sizeof(buffer->entry[0]);
+    size_t char_pos = 0;
+
+    if (buffer->full) {
+        if (char_offset < char_pos + buffer->entry[pos].size) {
+            *entry_offset_byte_rtn = char_offset - char_pos;
+            DEBUG_LOG("Found char_pos=%ld char=%ld", pos, *entry_offset_byte_rtn);
+            return &buffer->entry[pos];
+        }
+        char_pos += buffer->entry[pos].size;
+        pos = (pos + 1) % buffer_size;
+    }
+
+    while (pos != buffer->in_offs) {
+        if (char_offset < char_pos + buffer->entry[pos].size) {
+            DEBUG_LOG("Found char_pos=%ld char=%ld", pos, *entry_offset_byte_rtn);
+            *entry_offset_byte_rtn =char_offset - char_pos;
+            return &buffer->entry[pos];
+        }
+        char_pos += buffer->entry[pos].size;
+        pos = (pos + 1) % buffer_size;
+    }
+
     return NULL;
 }
 
@@ -44,9 +71,20 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
 */
 void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const struct aesd_buffer_entry *add_entry)
 {
-    /**
-    * TODO: implement per description
-    */
+    size_t buffer_size = sizeof(buffer->entry) / sizeof(buffer->entry[0]);
+
+    buffer->entry[buffer->in_offs].buffptr = add_entry->buffptr;
+    buffer->entry[buffer->in_offs].size = add_entry->size;
+    buffer->in_offs = (buffer->in_offs + 1) % buffer_size;
+
+    if (buffer->full) {
+        buffer->out_offs = (buffer->out_offs + 1) % buffer_size;    
+    } else {
+        if (buffer->in_offs == buffer->out_offs)
+            buffer->full = true;
+    }
+
+    DEBUG_LOG("Adding entry, full=%d in_offs=%d out_offs=%d", buffer->full, buffer->in_offs, buffer->out_offs);
 }
 
 /**

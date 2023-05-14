@@ -74,15 +74,21 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
 * Any necessary locking must be handled by the caller
 * Any memory referenced in @param add_entry must be allocated by and/or must have a lifetime managed by the caller.
 */
-void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const struct aesd_buffer_entry *add_entry)
+const char *aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const struct aesd_buffer_entry *add_entry)
 {
+    const char *old_data = NULL;
+
     size_t buffer_size = sizeof(buffer->entry) / sizeof(buffer->entry[0]);
+
+    if (buffer->full) {
+        old_data = buffer->entry[buffer->in_offs].buffptr;
+    }
 
     buffer->entry[buffer->in_offs].buffptr = add_entry->buffptr;
     buffer->entry[buffer->in_offs].size = add_entry->size;
     buffer->in_offs = (buffer->in_offs + 1) % buffer_size;
 
-    if (buffer->full) {
+    if (buffer->full) {        
         buffer->out_offs = (buffer->out_offs + 1) % buffer_size;    
     } else {
         if (buffer->in_offs == buffer->out_offs)
@@ -90,6 +96,8 @@ void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const s
     }
 
     PDEBUG("Adding entry, full=%d in_offs=%d out_offs=%d", buffer->full, buffer->in_offs, buffer->out_offs);
+
+    return old_data;
 }
 
 /**

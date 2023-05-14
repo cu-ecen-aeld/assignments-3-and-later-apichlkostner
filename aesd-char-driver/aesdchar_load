@@ -11,6 +11,8 @@ else
     group="wheel"
 fi
 
+group="arthur"
+
 if [ -e ${module}.ko ]; then
     echo "Loading local built file ${module}.ko"
     insmod ./$module.ko $* || exit 1

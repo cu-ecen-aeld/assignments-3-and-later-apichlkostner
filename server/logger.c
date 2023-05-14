@@ -77,7 +77,15 @@ int logger_send(logger *log, int cfd)
             return -1;
         }
 
-        lseek(log->fd, 0, SEEK_SET);
+        off_t new_pos = lseek(log->fd, 0, SEEK_SET);
+
+        if (new_pos == (off_t)-1) {
+            syslog(LOG_ERR, "Could not set file position for reading: %s", strerror(errno));
+            syslog(LOG_DEBUG, "Would be %ld", new_pos);
+            return -1;
+        } else {
+            syslog(LOG_DEBUG, "Setting pos in logfile to %ld", new_pos);
+        }
         ssize_t num_read = 0;
 
         do {

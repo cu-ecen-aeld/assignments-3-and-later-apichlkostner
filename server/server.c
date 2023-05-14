@@ -80,11 +80,14 @@ int server_run(bool daemon)
     serve_data sd[100];
     size_t thread_num = 0;
 
+#ifndef USE_AESD_CHAR_DEVICE
     serve_data_init(&sd[thread_num], cfd, log);
     int s = pthread_create(&sd[thread_num].thread, NULL, timelog, (void *)&sd[thread_num]);
     thread_num++;
+
     if (s != 0)
         return -1;
+#endif
 
     while(server_running) {
         socklen_t addrlen = sizeof(struct sockaddr_storage);
@@ -150,10 +153,12 @@ int server_run(bool daemon)
     if (cfd != -1)
         close(cfd);
 
+#ifndef USE_AESD_CHAR_DEVICE
     if ((access(LOGFILE_NAME, F_OK) == 0) && remove(LOGFILE_NAME) == -1) {
         ERROR_LOG("Error removing logile: %s", strerror(errno));
         ret_val = -1;
     }
+#endif
 
     return ret_val;
 }

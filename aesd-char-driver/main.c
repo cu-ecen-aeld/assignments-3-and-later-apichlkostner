@@ -73,16 +73,19 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 
         if (copy_to_user(buf, entry->buffptr, count)) {
             retval = -EFAULT;
+            count = 0;
             goto out;
         }
     } else {
         PDEBUG("End of file");
+        count = 0;
         retval = 0;
     }
 
 out:
 	mutex_unlock(&dev->lock);
     *f_pos += count;
+    PDEBUG("read: return new offset %lld", *f_pos);
 	return retval;
 }
 
@@ -132,7 +135,10 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
         data_size = 0;
     }
 
+    
+
 	*f_pos += count;
+    PDEBUG("write: return new offset %lld", *f_pos);
 	retval = count;
     
 
@@ -140,8 +146,36 @@ out:
 	mutex_unlock(&dev->lock);
 	return retval;
 }
+
+
+loff_t aesd_llseek(struct file *filp, loff_t off, int whence)
+{
+	loff_t newpos;
+
+	switch(whence) {
+	  case 0: /* SEEK_SET */
+		newpos = off;
+		break;
+
+	  case 1: /* SEEK_CUR */
+		newpos = filp->f_pos + off;
+		break;
+
+	  case 2: /* SEEK_END */
+		return -EINVAL;
+		break;
+
+	  default: /* can't happen */
+		return -EINVAL;
+	}
+	if (newpos < 0) return -EINVAL;
+	filp->f_pos = newpos;
+	return newpos;
+}
+
 struct file_operations aesd_fops = {
     .owner =    THIS_MODULE,
+    .llseek =   aesd_llseek,
     .read =     aesd_read,
     .write =    aesd_write,
     .open =     aesd_open,
@@ -202,7 +236,6 @@ void aesd_cleanup_module(void)
 
     unregister_chrdev_region(devno, 1);
 }
-
 
 
 module_init(aesd_init_module);

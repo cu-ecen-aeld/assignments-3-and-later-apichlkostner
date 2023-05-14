@@ -53,7 +53,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 {
     ssize_t retval = 0;
     struct aesd_dev *dev;
-    size_t entry_offset_byte_rtn, len;
+    size_t entry_offset_byte_rtn;
     struct aesd_buffer_entry *entry;
     PDEBUG("read %zu bytes with offset %lld", count, *f_pos);
 
@@ -69,7 +69,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
         count = min(count, entry->size - entry_offset_byte_rtn);
         retval = count;
 
-        PDEBUG("read from pos %ld with len %ld", entry_offset_byte_rtn, count);
+        PDEBUG("read from offset pos %ld with len %ld", entry_offset_byte_rtn, count);
 
         if (copy_to_user(buf, entry->buffptr, count)) {
             retval = -EFAULT;
@@ -89,15 +89,17 @@ out:
 ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
                 loff_t *f_pos)
 {
+    static char *data ;
+    static size_t data_size;
+
     struct aesd_dev *dev;
-    char *data;
     struct aesd_buffer_entry entry;
     ssize_t retval = -ENOMEM;
     PDEBUG("write %zu bytes with offset %lld", count, *f_pos);
     
     dev = filp->private_data;
 
-    data = kmalloc(count, GFP_KERNEL);
+    data = krealloc(data, data_size + count, GFP_KERNEL);    
 
     if (!data) {
         return -ERESTARTSYS; // TODO: real value
@@ -107,15 +109,22 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 		return -ERESTARTSYS;
     }
 
-    if (copy_from_user(data, buf, count)) {
+    if (copy_from_user(data + data_size, buf, count)) {
 		retval = -EFAULT;
 		goto out;
 	}
 
-    entry.buffptr = data;
-    entry.size = count;
+    data_size += count;
 
-    aesd_circular_buffer_add_entry(&dev->cb, &entry);
+    if (data[data_size -1] == '\n') {
+        entry.buffptr = data;
+        entry.size = data_size;
+
+        aesd_circular_buffer_add_entry(&dev->cb, &entry);
+
+        data = NULL;
+        data_size = 0;
+    }
 
 	*f_pos += count;
 	retval = count;

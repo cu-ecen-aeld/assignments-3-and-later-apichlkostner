@@ -71,7 +71,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 
         PDEBUG("read from offset pos %ld with len %ld", entry_offset_byte_rtn, count);
 
-        if (copy_to_user(buf, entry->buffptr, count)) {
+        if (copy_to_user(buf, &entry->buffptr[entry_offset_byte_rtn], count)) {
             retval = -EFAULT;
             count = 0;
             goto out;
@@ -102,6 +102,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     
     dev = filp->private_data;
 
+    PDEBUG("Write: old size: %zu  new size: %zu", data_size, data_size + count);
     data = krealloc(data, data_size + count, GFP_KERNEL);    
 
     if (!data) {

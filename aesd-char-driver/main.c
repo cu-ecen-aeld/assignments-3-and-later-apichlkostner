@@ -65,16 +65,20 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     
     entry = aesd_circular_buffer_find_entry_offset_for_fpos(&dev->cb, *f_pos, &entry_offset_byte_rtn);
 
-    count = min(count, entry->size - entry_offset_byte_rtn);
-    
-    retval = count;
+    if (entry) {
+        count = min(count, entry->size - entry_offset_byte_rtn);
+        retval = count;
 
-    PDEBUG("read from pos %ld with len %ld", entry_offset_byte_rtn, count);
+        PDEBUG("read from pos %ld with len %ld", entry_offset_byte_rtn, count);
 
-    if (copy_to_user(buf, entry->buffptr, count)) {
-		retval = -EFAULT;
-		goto out;
-	}
+        if (copy_to_user(buf, entry->buffptr, count)) {
+            retval = -EFAULT;
+            goto out;
+        }
+    } else {
+        PDEBUG("End of file");
+        retval = 0;
+    }
 
 out:
 	mutex_unlock(&dev->lock);

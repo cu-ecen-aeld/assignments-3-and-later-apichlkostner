@@ -52,11 +52,13 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
     }
 
     while (pos != buffer->in_offs) {
+        PDEBUG("Searching pos=%ld char_char=%ld", pos, char_pos);
         if (char_offset < char_pos + buffer->entry[pos].size) {
-            *entry_offset_byte_rtn =char_offset - char_pos;
+            *entry_offset_byte_rtn = char_offset - char_pos;
             PDEBUG("Found char_pos=%ld char=%ld", pos, *entry_offset_byte_rtn);
             return &buffer->entry[pos];
         }
+        PDEBUG("After if");
         char_pos += buffer->entry[pos].size;
         pos = (pos + 1) % buffer_size;
     }

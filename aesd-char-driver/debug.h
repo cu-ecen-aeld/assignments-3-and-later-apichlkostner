@@ -1,25 +1,22 @@
 #pragma once
 
+#define AESD_DEBUG
+
 #ifdef __KERNEL__
 
-#define DEBUG_LOG(msg,...)
-#define ERROR_LOG(msg,...)
+#include <linux/printk.h>
 
-#else
-
-#include <stdio.h>
-#include <syslog.h>
-
-#define DEBUG
-
-#ifndef DEBUG
-    #define DEBUG_LOG(msg,...)
-#else
-    #define DEBUG_LOG(msg,...) printf("Circular buffer: " msg "\n" , ##__VA_ARGS__)
-    //#define DEBUG_LOG(msg,...) syslog(LOG_DEBUG, "Circular buffer: " msg "\n" , ##__VA_ARGS__)
 #endif
 
-#define ERROR_LOG(msg,...) printf("Circular buffer: " msg "\n" , ##__VA_ARGS__)
-//#define ERROR_LOG(msg,...) syslog(LOG_ERR, "Circular buffer: " msg "\n" , ##__VA_ARGS__)
-
+#undef PDEBUG             /* undef it, just in case */
+#ifdef AESD_DEBUG
+#  ifdef __KERNEL__
+     /* This one if debugging is on, and kernel space */
+#    define PDEBUG(fmt, args...) printk( KERN_DEBUG "aesdchar: " fmt, ## args)
+#  else
+     /* This one for user space */
+#    define PDEBUG(fmt, args...) fprintf(stderr, fmt, ## args)
+#  endif
+#else
+#  define PDEBUG(fmt, args...) /* not debugging: nothing */
 #endif

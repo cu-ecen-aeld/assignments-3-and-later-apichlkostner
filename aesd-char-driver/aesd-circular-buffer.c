@@ -30,19 +30,21 @@
 struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct aesd_circular_buffer *buffer,
             size_t char_offset, size_t *entry_offset_byte_rtn )
 {
+    size_t pos, buffer_size, char_pos;
+
     if ((buffer->in_offs == buffer->out_offs) && !buffer->full) {
-        DEBUG_LOG("Buffer empty");
+        PDEBUG("Buffer empty");
         return NULL;
     }
 
-    size_t pos = buffer->out_offs;
-    size_t buffer_size = sizeof(buffer->entry) / sizeof(buffer->entry[0]);
-    size_t char_pos = 0;
+    pos = buffer->out_offs;
+    buffer_size = sizeof(buffer->entry) / sizeof(buffer->entry[0]);
+    char_pos = 0;
 
     if (buffer->full) {
         if (char_offset < char_pos + buffer->entry[pos].size) {
             *entry_offset_byte_rtn = char_offset - char_pos;
-            DEBUG_LOG("Found char_pos=%ld char=%ld", pos, *entry_offset_byte_rtn);
+            PDEBUG("Found char_pos=%ld char=%ld", pos, *entry_offset_byte_rtn);
             return &buffer->entry[pos];
         }
         char_pos += buffer->entry[pos].size;
@@ -51,8 +53,8 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
 
     while (pos != buffer->in_offs) {
         if (char_offset < char_pos + buffer->entry[pos].size) {
-            DEBUG_LOG("Found char_pos=%ld char=%ld", pos, *entry_offset_byte_rtn);
             *entry_offset_byte_rtn =char_offset - char_pos;
+            PDEBUG("Found char_pos=%ld char=%ld", pos, *entry_offset_byte_rtn);
             return &buffer->entry[pos];
         }
         char_pos += buffer->entry[pos].size;
@@ -84,7 +86,7 @@ void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const s
             buffer->full = true;
     }
 
-    DEBUG_LOG("Adding entry, full=%d in_offs=%d out_offs=%d", buffer->full, buffer->in_offs, buffer->out_offs);
+    PDEBUG("Adding entry, full=%d in_offs=%d out_offs=%d", buffer->full, buffer->in_offs, buffer->out_offs);
 }
 
 /**

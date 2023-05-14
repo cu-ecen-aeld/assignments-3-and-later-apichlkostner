@@ -14,6 +14,7 @@
      /* This one if debugging is on, and kernel space */
 #    define PDEBUG(fmt, args...) printk( KERN_DEBUG "aesdchar: " fmt, ## args)
 #  else
+     #include <stdio.h>
      /* This one for user space */
 #    define PDEBUG(fmt, args...) fprintf(stderr, fmt, ## args)
 #  endif

@@ -19,6 +19,7 @@
 #include <linux/fs.h> // file_operations
 #include "aesdchar.h"
 #include "debug.h"
+#include "aesd_ioctl.h"
 
 int aesd_major = 0; // use dynamic major
 int aesd_minor = 0;
@@ -134,9 +135,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 
         data = NULL;
         data_size = 0;
-    }
-
-    
+    }    
 
 	*f_pos += count;
     PDEBUG("write: return new offset %lld", *f_pos);
@@ -163,7 +162,7 @@ loff_t aesd_llseek(struct file *filp, loff_t off, int whence)
 		break;
 
 	  case 2: /* SEEK_END */
-		return -EINVAL;
+		newpos = filp->f_pos + aesd_device.cb.size;
 		break;
 
 	  default: /* can't happen */
@@ -174,6 +173,53 @@ loff_t aesd_llseek(struct file *filp, loff_t off, int whence)
 	return newpos;
 }
 
+long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+{
+
+	int err = 0;
+	int retval = 0;
+    
+	/*
+	 * extract the type and number bitfields, and don't decode
+	 * wrong cmds: return ENOTTY (inappropriate ioctl) before access_ok()
+	 */
+	if (_IOC_TYPE(cmd) != AESD_IOC_MAGIC) return -ENOTTY;
+	if (_IOC_NR(cmd) > AESDCHAR_IOC_MAXNR) return -ENOTTY;
+
+	/*
+	 * the direction is a bitmask, and VERIFY_WRITE catches R/W
+	 * transfers. `Type' is user-oriented, while
+	 * access_ok is kernel-oriented, so the concept of "read" and
+	 * "write" is reversed
+	 */
+    //access_ok(arg, cmd)
+	if (_IOC_DIR(cmd) & _IOC_READ)
+		err = !access_ok((void __user *)arg, _IOC_SIZE(cmd));
+	else if (_IOC_DIR(cmd) & _IOC_WRITE)
+		err =  !access_ok((void __user *)arg, _IOC_SIZE(cmd));
+	if (err) return -EFAULT;
+
+	switch(cmd) {
+	  case AESDCHAR_IOCSEEKTO:
+      {
+		bool error = false;
+        struct aesd_seekto *seekto = (struct aesd_seekto *)arg;
+        size_t fpos = aesd_circular_buffer_find_fpos(
+            &aesd_device.cb, seekto->write_cmd, seekto->write_cmd_offset, &error);
+
+        if (error)
+            retval = -EINVAL;
+        else
+            filp->f_pos = fpos;
+      }
+	  break;
+        
+	  default:  /* redundant, as cmd was checked against MAXNR */
+		return -ENOTTY;
+	}
+	return retval;
+}
+
 struct file_operations aesd_fops = {
     .owner =    THIS_MODULE,
     .llseek =   aesd_llseek,
@@ -181,6 +227,7 @@ struct file_operations aesd_fops = {
     .write =    aesd_write,
     .open =     aesd_open,
     .release =  aesd_release,
+    .unlocked_ioctl = aesd_ioctl,
 };
 
 static int aesd_setup_cdev(struct aesd_dev *dev)

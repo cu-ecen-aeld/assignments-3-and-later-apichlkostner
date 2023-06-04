@@ -67,6 +67,56 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
     return NULL;
 }
 
+size_t aesd_circular_buffer_find_fpos(struct aesd_circular_buffer *buffer,
+            size_t buffer_offset, size_t char_offset, bool *error)
+{
+    size_t entry_rel_pos = 0;
+    size_t fpos = 0;
+    size_t pos;
+    size_t buffer_size;
+    *error = false;
+
+    pos = buffer->out_offs;
+    //PDEBUG("buffer->out_offs=%d buffer->in_offs=%d", buffer->out_offs, buffer->in_offs);
+    buffer_size = sizeof(buffer->entry) / sizeof(buffer->entry[0]);
+
+    if (buffer->full) {
+        PDEBUG("Buffer is full");
+        if (buffer_offset != entry_rel_pos) {
+            fpos += buffer->entry[pos].size;
+            pos = (pos + 1) % buffer_size;
+            entry_rel_pos++;
+        } else {
+            if (buffer->entry[pos].size >= char_offset)
+                fpos += char_offset;
+            else
+                *error = true;
+
+            return fpos;
+        }
+    }
+
+
+    while (pos != buffer->in_offs) {
+        //PDEBUG("Searching pos=%ld char_pos=%ld", pos, char_pos);
+        if (buffer_offset != entry_rel_pos) {
+            fpos += buffer->entry[pos].size;
+            pos = (pos + 1) % buffer_size;
+            entry_rel_pos++;
+        } else {
+            if (buffer->entry[pos].size >= char_offset)
+                fpos += char_offset;
+            else
+                *error = true;
+
+            return fpos;
+        }
+    }
+
+    *error = true;
+    return fpos;
+}
+
 /**
 * Adds entry @param add_entry to @param buffer in the location specified in buffer->in_offs.
 * If the buffer was already full, overwrites the oldest entry and advances buffer->out_offs to the
@@ -82,7 +132,9 @@ const char *aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, 
 
     if (buffer->full) {
         old_data = buffer->entry[buffer->in_offs].buffptr;
+        buffer->size -= buffer->entry[buffer->in_offs].size;
     }
+    buffer->size += add_entry->size;
 
     buffer->entry[buffer->in_offs].buffptr = add_entry->buffptr;
     buffer->entry[buffer->in_offs].size = add_entry->size;

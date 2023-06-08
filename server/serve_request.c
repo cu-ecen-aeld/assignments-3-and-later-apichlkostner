@@ -52,13 +52,34 @@ void *serve_request(void *args)
 
         if (num_read <= 0)
             break;
-                    
-        logger_write(&(sd->log), buffer);
+        
+        char *seekstr = "AESDCHAR_IOCSEEKTO:";
+        size_t seekstr_size = strlen(seekstr);
+        bool seek = ((buffer.size > seekstr_size) &&
+                     (strncmp(buffer.data, seekstr, seekstr_size) == 0));
+        if (seek) {
+            char *data = buffer.data + seekstr_size;
+            char *next;
+            size_t x0, x1;
 
-        if (logger_send(&(sd->log), sd->cfd) == -1) {
-            ERROR_LOG("Could not sent back data");
-            break;
+            DEBUG_LOG("ioctl buffer.data: %s", buffer.data);
+            DEBUG_LOG("ioctl str: %s", data);
+            x0 = strtoul(data, &next, 10);
+            x1 = strtoul(next + 1, &next, 10);
+            DEBUG_LOG("ioctl: %lu, %lu", x0, x1);
+            if (logger_send_seek(&(sd->log), sd->cfd, x0, x1) == -1) {
+                ERROR_LOG("Could not sent back data");
+                break;
+            }
+        } else {
+            logger_write(&(sd->log), buffer);
+            if (logger_send(&(sd->log), sd->cfd) == -1) {
+                ERROR_LOG("Could not sent back data");
+                break;
+            }
         }
+
+        
     }
     close(sd->cfd);
     sd->cfd = -1;

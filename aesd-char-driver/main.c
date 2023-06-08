@@ -150,73 +150,78 @@ out:
 
 loff_t aesd_llseek(struct file *filp, loff_t off, int whence)
 {
-	loff_t newpos;
+	loff_t f_pos;
+    struct aesd_dev *dev;
+    
+    dev = filp->private_data;
+
+    if (mutex_lock_interruptible(&dev->lock)) {
+		return -ERESTARTSYS;
+    }
 
 	switch(whence) {
 	  case 0: /* SEEK_SET */
-		newpos = off;
+		f_pos = off;
 		break;
 
 	  case 1: /* SEEK_CUR */
-		newpos = filp->f_pos + off;
+		f_pos = filp->f_pos + off;
 		break;
 
 	  case 2: /* SEEK_END */
-		newpos = filp->f_pos + aesd_device.cb.size;
+		f_pos = filp->f_pos + aesd_device.cb.size;
 		break;
 
 	  default: /* can't happen */
-		return -EINVAL;
+		f_pos = -EINVAL;
+        goto out;
 	}
-	if (newpos < 0) return -EINVAL;
-	filp->f_pos = newpos;
-	return newpos;
+
+	if (f_pos < 0) {
+        f_pos = -EINVAL;
+        goto out;
+    }
+
+	filp->f_pos = f_pos;
+
+out:
+    mutex_unlock(&dev->lock);
+
+    PDEBUG("llseek: return new offset %lld", f_pos);
+	return f_pos;
 }
 
 long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
-
-	int err = 0;
 	int retval = 0;
-    
-	/*
-	 * extract the type and number bitfields, and don't decode
-	 * wrong cmds: return ENOTTY (inappropriate ioctl) before access_ok()
-	 */
-	if (_IOC_TYPE(cmd) != AESD_IOC_MAGIC) return -ENOTTY;
+ 
+ 	if (_IOC_TYPE(cmd) != AESD_IOC_MAGIC) return -ENOTTY;
 	if (_IOC_NR(cmd) > AESDCHAR_IOC_MAXNR) return -ENOTTY;
-
-	/*
-	 * the direction is a bitmask, and VERIFY_WRITE catches R/W
-	 * transfers. `Type' is user-oriented, while
-	 * access_ok is kernel-oriented, so the concept of "read" and
-	 * "write" is reversed
-	 */
-    //access_ok(arg, cmd)
-	if (_IOC_DIR(cmd) & _IOC_READ)
-		err = !access_ok((void __user *)arg, _IOC_SIZE(cmd));
-	else if (_IOC_DIR(cmd) & _IOC_WRITE)
-		err =  !access_ok((void __user *)arg, _IOC_SIZE(cmd));
-	if (err) return -EFAULT;
 
 	switch(cmd) {
 	  case AESDCHAR_IOCSEEKTO:
       {
-		bool error = false;
-        struct aesd_seekto *seekto = (struct aesd_seekto *)arg;
-        size_t fpos = aesd_circular_buffer_find_fpos(
-            &aesd_device.cb, seekto->write_cmd, seekto->write_cmd_offset, &error);
+        struct aesd_seekto seekto;
 
-        if (error)
-            retval = -EINVAL;
-        else
-            filp->f_pos = fpos;
+        if (copy_from_user(&seekto, (const void __user *)arg, sizeof(seekto)) != 0) {
+            retval = -EFAULT;
+        } else {
+            bool error = false;
+            size_t fpos = aesd_circular_buffer_find_fpos(
+                &aesd_device.cb, seekto.write_cmd, seekto.write_cmd_offset, &error);
+            
+            if (error)
+                retval = -EINVAL;
+            else
+                filp->f_pos = fpos;
+        }        
       }
 	  break;
         
-	  default:  /* redundant, as cmd was checked against MAXNR */
+	  default:
 		return -ENOTTY;
 	}
+
 	return retval;
 }
 

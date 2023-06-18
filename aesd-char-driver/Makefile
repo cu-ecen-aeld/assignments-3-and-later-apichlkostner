@@ -1,4 +1,5 @@
 obj-m := aesdchar.o
+aesdchar-y := aesd-circular-buffer.o main.o
 
 SRC := $(shell pwd)
 
